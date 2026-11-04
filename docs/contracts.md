@@ -50,4 +50,4 @@ shapes are reviewed. Neither media choice is implied by `WindowMetadata`.
 Review the producer and consumer together. Update types, this document, example
 messages, and tests in the same change. Record units and failure behavior explicitly.
 Keep evaluation labels out of online inputs; separate requested budgets from actual
-observed work. Review both sides of a handoff before proposing a change.
+observed work. Run the contract-review skill before handing off a proposed change.

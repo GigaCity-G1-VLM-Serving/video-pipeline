@@ -63,12 +63,19 @@ package selection controls installation. Dockerfiles and CI are outside this mil
 VS Code and Cursor users should install the recommended extensions and select this
 repo's `.venv` interpreter. Python uses four spaces; other text defaults to two.
 
+Codex and Cursor use root [AGENTS.md](AGENTS.md). Claude Code loads the same guidance
+through [CLAUDE.md](CLAUDE.md). Ask your agent to summarize the project instructions
+to verify that it loaded them. For contract work, it should read
+[the contract-review skill](.agents/skills/contract-review/SKILL.md); tools without
+native discovery can read that file directly. No matching slash-command menu is required.
 
 ## Contributing
 
 Make focused changes in the owning component. Update draft models, examples, tests,
 and affected consumers together when proposing a shared contract change. Review the
 media handoff with both teams before implementing a frames-only or clips-only path.
-Before handing off changes, run the two commands above and report what was checked.
+Use Conventional Commit messages; agent-created commits must include the agent
+co-author trailer described in `AGENTS.md`. Before handing off changes, run the two
+commands above and report what was checked.
 Use small synthetic test fixtures; keep datasets, weights, secrets, and generated
 results out of Git. A project license has not yet been selected.
