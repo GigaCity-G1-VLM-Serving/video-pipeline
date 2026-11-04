@@ -1,0 +1,42 @@
+# Python and tooling
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Credentials and local overrides
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+CLAUDE.local.md
+
+# Downloaded or generated artifacts
+/data/
+/datasets/
+/models/
+/weights/
+/results/
+/outputs/
+/cache/
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.safetensors
+*.pt
+*.pth
+*.onnx
+*.db
+*.sqlite*
+
+# Operating systems
+.DS_Store
+Thumbs.db

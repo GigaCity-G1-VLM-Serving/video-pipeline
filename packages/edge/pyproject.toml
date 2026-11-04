@@ -1,0 +1,11 @@
+[project]
+name = "gigacity-edge"
+version = "0.1.0"
+description = "GigaCity edge package"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["gigacity-contracts"]
+
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
