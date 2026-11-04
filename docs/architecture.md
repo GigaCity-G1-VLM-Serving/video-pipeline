@@ -37,7 +37,7 @@ No implementation should infer these decisions from the presence of example meta
 
 ## Research references
 
-See the sibling `initial-research/Gigacity_G1_Project_Proposal.md` and the
-[dataset/pilot write-up](https://gist.github.com/adityachandak287/1e37deccd4c62d375624f419238c8245).
+See the local [proposal snapshot](research/project-proposal.md) and
+[initial dataset/pilot evaluation](research/dataset-selection-and-pilot.md).
 The October 27 meeting narrowed the initial workload to collisions, chose simulated
 edge constraints and RunPod, and assigned repo/interfaces to Aditya before A/B research.

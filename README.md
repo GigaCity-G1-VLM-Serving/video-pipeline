@@ -36,7 +36,18 @@ pytest tests. EditorConfig and editor settings handle basic text conventions.
 
 Each package has its own `pyproject.toml`, `src/`, and `tests/` directory. The virtual
 workspace root holds shared development tools and configuration, plus one `uv.lock`.
-The existing `initial-research` directory stays outside this repo as reference material.
+The existing `initial-research` directory stays outside this repo; selected research
+snapshots are included below for teammates and agents.
+
+## Research context
+
+- [Original project proposal](docs/research/project-proposal.md): background rationale
+  and proposed workstreams; some decisions predate the October 27 meeting.
+- [Initial dataset evaluation and pilot](docs/research/dataset-selection-and-pilot.md):
+  dataset selection, recorded results, caveats, and a local copy of the pilot plot.
+
+These are dated research snapshots. Use [architecture](docs/architecture.md) and
+[contracts](docs/contracts.md) for current implementation decisions and open interfaces.
 
 ## Dependencies and deployment
 

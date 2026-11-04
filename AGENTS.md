@@ -7,6 +7,11 @@ shared interfaces. This is a collision-focused pipeline scaffold, not a running
 VLM system. A/B own edge selection and transport; C owns serving/budgets; D owns
 workload/replay/evaluation. Aditya coordinates integration and contract review.
 
+For research rationale, read `docs/research/project-proposal.md` and
+`docs/research/dataset-selection-and-pilot.md`. These are historical snapshots;
+use architecture/contracts for current implementation decisions. Availability and
+performance statements in the snapshots have not been revalidated.
+
 ## Development
 
 - Use Python 3.12 and uv. Root `uv sync --locked` installs contracts and dev tools.
