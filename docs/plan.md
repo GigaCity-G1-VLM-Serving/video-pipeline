@@ -16,20 +16,20 @@ selection at 4, 8, and 16 frames on a pilot set.
 |---|---|---|
 | Agree on draft contracts and defaults with C/D | A/B, C/D | proposed; see [decisions](decisions.md) |
 | Draft inference contracts in `packages/contracts` | A/B | done (draft) |
-| Temporary pilot list from TAR train yes/no questions, split by source video | A/B, hand to D | in progress |
-| Uniform and motion selectors over the whole video | A | in progress |
-| Edge pipeline: decode, resize, JPEG, bytes, request, JSONL records | B | in progress |
-| Mock C server returning synthetic results | A/B | in progress |
-| A/B test server: vLLM + Qwen2.5-VL-7B on RunPod, labeled as A/B test runs | A/B | in progress |
+| Temporary pilot list from TAR train yes/no questions, split by source video | A/B, hand to D | done: 25 Accident-Bench videos, 50 questions; hand to D |
+| Uniform and motion selectors over the whole video | A | done |
+| Edge pipeline: decode, resize, JPEG, bytes, request, JSONL records | B | done |
+| Mock C server returning synthetic results | A/B | done |
+| A/B test server: vLLM + Qwen2.5-VL-7B on RunPod, labeled as A/B test runs | A/B | done (November 10 runs; pod deleted after use) |
 | C's serving endpoint | C | not started in repo |
-| Whole-video comparison scored on accuracy and Yes recall | A/B, then D | in progress |
+| Whole-video comparison scored on accuracy and Yes recall | A/B, then D | first A/B test-server results in [results](results/2026-11-10-whole-video-pilot.md); D to rescore |
 
 ## Milestone 2: bandwidth and load (November 10–16)
 
 | Step | Owner | Status |
 |---|---|---|
-| Request size at 4, 8, 16 frames versus compressed full video; what fits under 5 Mbit/s | B | in progress |
-| Fixed budgets at 1, 2, 4, 8, 16 concurrent requests: throughput, tail latency | B with C | A/B test server first; C's numbers later |
+| Request size at 4, 8, 16 frames versus compressed full video; what fits under 5 Mbit/s | B | done (first pass) |
+| Fixed budgets at 1, 2, 4, 8, 16 concurrent requests: throughput, tail latency | B with C | A/B test-server sweep done; C's numbers later |
 
 ## Milestone 3: live monitoring (November 17–23)
 
@@ -55,6 +55,9 @@ selection at 4, 8, and 16 frames on a pilot set.
 
 ## Blocked or waiting
 
+- Model choice: Qwen2.5-VL-7B rarely answers Yes on crash videos even with frames on the
+  annotated crash; see [results](results/2026-11-10-whole-video-pilot.md). Selector
+  comparisons are not meaningful until the model or prompt can recognise collisions.
 - C's serving endpoint and mentor confirmation of vLLM.
 - HTV videos need a Kaggle API key; the pilot starts with Accident-Bench only.
 - D's official manifest and verified windows.
