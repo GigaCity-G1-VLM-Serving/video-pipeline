@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "GigaCity central package"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["gigacity-contracts"]
+dependencies = [
+    "gigacity-contracts",
+    "httpx>=0.27,<1",
+]
 
 [build-system]
 requires = ["hatchling>=1.26"]
