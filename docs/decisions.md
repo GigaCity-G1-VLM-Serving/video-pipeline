@@ -23,7 +23,7 @@ date in the same change that implements the decision.
 
 | # | Decision | Status | Source and notes |
 |---|---|---|---|
-| 7 | Serving engine is vLLM, one pinned version (v0.32.0 for A/B test runs) | proposed | C/D plan; mentors asked to confirm. The October 6 project doc named SGLang |
+| 7 | Serving engine is vLLM, one pinned version | proposed | C/D plan; mentors asked to confirm. The October 6 project doc named SGLang. A/B test runs use image `vllm/vllm-openai:cu129-nightly-77154ca…` (October 14 build, CUDA 12.9), because RunPod had no hosts for the CUDA 13 release images |
 | 8 | Evidence is JPEG frames; clips are not sent | proposed | Matches milestone 1 and the C/D plan; revisit if bandwidth results favor clips |
 | 9 | Frames reach the model as separate images with capture times in the prompt, not as "video" input | proposed | vLLM's Qwen2.5-VL video path uses one time interval per video and merges frames in pairs (checked in vLLM and Transformers source, November 10). Separate images keep irregular spacing correct |
 | 10 | The edge resizes frames to fit 448×448, keeping aspect ratio, with sides a multiple of 28 (640×360 → 448×252), JPEG quality 85; C applies the same pixel cap so it never resizes again | proposed | Keeps edge byte counts equal to what C receives; about 144 visual tokens per frame |
