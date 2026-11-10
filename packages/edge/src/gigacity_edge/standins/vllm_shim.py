@@ -19,9 +19,7 @@ from gigacity_contracts import InferenceRequest, InferenceResult
 from gigacity_edge.standins._http import make_server, unix_ms
 
 DEFAULT_MODEL = "qwen2.5-vl-7b"
-DEFAULT_MODEL_ID = (
-    "qwen2.5-vl-7b-instruct@cc594898 vllm-cu129-nightly-77154ca ab-test-server"
-)
+DEFAULT_MODEL_ID = "qwen2.5-vl-7b-instruct@cc594898 vllm-v0.11.0 ab-test-server"
 ANSWER_SUFFIX = " Answer only Yes or No."
 
 
