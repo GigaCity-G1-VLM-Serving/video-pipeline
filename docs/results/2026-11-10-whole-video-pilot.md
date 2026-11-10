@@ -49,14 +49,32 @@ different event than the question, so it is approximate.
 | Model | Yes recall, crash frames | Yes recall, uniform 8 | No questions correct |
 |---|---|---|---|
 | Qwen2.5-VL-7B | 7/25 (28%) | 5/25 (20%) | 25/25 |
+| Qwen3-VL-8B | 11/25 (44%) | 8/25 (32%) | 20/25 |
 
 Even with frames on the crash, Qwen2.5-VL-7B mostly answers "No". **The model, not
-frame selection, is the current bottleneck**, so a stronger model is being compared
-below; switching requires team agreement (decision 3).
+frame selection, is the current bottleneck.** Qwen3-VL-8B sees more crashes but still
+fewer than half; switching models requires team agreement (decision 3).
 
 ## 3. Qwen3-VL-8B-Instruct comparison
 
-In progress; results will be added here.
+Same pilot, pipeline, and server image, with `Qwen/Qwen3-VL-8B-Instruct` (revision
+`0c351dd0`). Qwen3-VL uses a 32-pixel grid, so 448×252 frames are processed at about
+112 visual tokens each instead of 144. All 300 requests completed.
+
+| Selector | Frames | Accuracy | Yes recall | No accuracy | Says "Yes" | p50 latency |
+|---|---|---|---|---|---|---|
+| uniform | 4 | 54% | 24% | 84% | 10/50 | 0.73 s |
+| uniform | 8 | 58% | 32% | 84% | 12/50 | 0.84 s |
+| uniform | 16 | 56% | 36% | 76% | 15/50 | 1.20 s |
+| motion | 4 | 58% | 28% | 88% | 10/50 | 0.49 s |
+| motion | 8 | 56% | 32% | 80% | 13/50 | 0.61 s |
+| motion | 16 | 56% | 32% | 80% | 13/50 | 0.85 s |
+
+Compared with Qwen2.5-VL-7B, Qwen3-VL-8B detects more crashes (Yes recall 24–36% versus
+8–20%) and, unlike Qwen2.5, improves with more frames, at the cost of more false "Yes"
+answers; overall accuracy is unchanged at about 55%. Selection still makes no
+measurable difference on 50 questions. Latency differences between the two runs
+include proxy variance and are not a model speed comparison.
 
 ## 4. Serving load: Qwen2.5-VL-7B, uniform, 8 frames
 
@@ -93,3 +111,6 @@ transport overhead is excluded.
 - Small pilot (50 questions, one dataset source, AI-generated labels); directional only.
 - Many Accident-Bench videos are compilations; motion selection favours scene cuts.
 - Latency includes the RunPod proxy and is not a C serving measurement.
+- The event-centred diagnostic was a one-off script outside the repo; D's planned
+  diagnostic should replace it.
+- GPU cost for all runs was about $0.45 (one A40 for about 41 minutes, plus a short probe).
