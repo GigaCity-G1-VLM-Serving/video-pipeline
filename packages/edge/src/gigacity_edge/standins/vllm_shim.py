@@ -58,7 +58,9 @@ def parse_answer(text: str | None) -> str:
 
 
 def call_vllm(url: str, api_key: str | None, payload: dict, timeout_s: float) -> dict:
-    headers = {"Content-Type": "application/json"}
+    # RunPod's proxy sits behind Cloudflare, which rejects urllib's default
+    # User-Agent with HTTP 403 (error 1010).
+    headers = {"Content-Type": "application/json", "User-Agent": "gigacity-edge/0.1"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     http_request = urllib.request.Request(

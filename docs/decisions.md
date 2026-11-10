@@ -23,7 +23,7 @@ date in the same change that implements the decision.
 
 | # | Decision | Status | Source and notes |
 |---|---|---|---|
-| 7 | Serving engine is vLLM, one pinned version | proposed | C/D plan; mentors asked to confirm. The October 6 project doc named SGLang. A/B test runs use `vllm/vllm-openai:v0.11.0` (CUDA 12.8) with prefix caching off: RunPod had no hosts for the CUDA 13 release images, and the available A40 host's driver did not start a CUDA 12.9 build |
+| 7 | Serving engine is vLLM, one pinned version | proposed | C/D plan; mentors asked to confirm. The October 6 project doc named SGLang. A/B test runs use `vllm/vllm-openai:v0.11.0` (CUDA 12.8) with prefix caching off. Pod creation failed whenever RunPod's `allowedCudaVersions` filter was set, although the A40 host it then assigned reports driver 595 (CUDA 13.2); an earlier attempt with a CUDA 12.9 build never served, cause unknown because no logs were captured. Newer releases are worth retrying with logs |
 | 8 | Evidence is JPEG frames; clips are not sent | proposed | Matches milestone 1 and the C/D plan; revisit if bandwidth results favor clips |
 | 9 | Frames reach the model as separate images with capture times in the prompt, not as "video" input | proposed | vLLM's Qwen2.5-VL video path uses one time interval per video and merges frames in pairs (checked in vLLM and Transformers source, November 10). Separate images keep irregular spacing correct |
 | 10 | The edge resizes frames to fit 448×448, keeping aspect ratio, with sides a multiple of 28 (640×360 → 448×252), JPEG quality 85; C applies the same pixel cap so it never resizes again | proposed | Keeps edge byte counts equal to what C receives; about 144 visual tokens per frame |
