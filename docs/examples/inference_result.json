@@ -1,0 +1,16 @@
+{
+  "run_id": "demo-run-01",
+  "window_id": "demo-camera-01-window-0001",
+  "status": "completed",
+  "answer_text": "No",
+  "answer": "no",
+  "model_id": "synthetic-model",
+  "frames_used": 2,
+  "prompt_tokens": 350,
+  "completion_tokens": 2,
+  "queue_duration_ms": 15,
+  "inference_duration_ms": 420,
+  "received_at_unix_ms": 1794355200050,
+  "completed_at_unix_ms": 1794355200485,
+  "is_synthetic": true
+}
