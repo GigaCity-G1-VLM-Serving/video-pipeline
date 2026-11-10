@@ -2,8 +2,9 @@
 
 ## Context
 
-Read `README.md`, `docs/architecture.md`, and `docs/contracts.md` before changing
-shared interfaces. This is a collision-focused pipeline scaffold, not a running
+Read `README.md`, `docs/architecture.md`, `docs/contracts.md`, and
+`docs/decisions.md` before changing shared interfaces; `docs/plan.md` tracks
+milestones and status. This is a collision-focused pipeline scaffold, not a running
 VLM system. A/B own edge selection and transport; C owns serving/budgets; D owns
 workload/replay/evaluation. Aditya coordinates integration and contract review.
 

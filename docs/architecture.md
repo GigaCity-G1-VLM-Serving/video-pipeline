@@ -24,16 +24,18 @@ flowchart LR
   It may send a budget for a subsequent window back to B; feedback behavior is draft.
 - D joins edge and central records by window identity and compares against baselines.
 
-Only the shared metadata model exists in this scaffold. Component modules expose
-no runtime pipeline API yet. RunPod is the initial GPU target from the meeting;
+The shared contracts hold window metadata plus draft inference request, result, and
+edge-record models proposed by A/B. Component modules expose no stable runtime API yet. RunPod is the initial GPU target from the meeting;
 physical edge limits are simulated. Keep deployment/provider details outside contracts.
 
-## Design decisions still needed
+## Design decisions
 
-Agree on frames versus clips, the serving engine, workload window settings, transport,
-result/status shape, feedback units and cadence, and retry/drop/deadline behavior.
-Full-video archival is an experimental question, not a required storage subsystem.
-No implementation should infer these decisions from the presence of example metadata.
+The [decision log](decisions.md) records each decision and whether it is agreed or
+only proposed. A/B have proposed JPEG frames sent to vLLM as separate images, a
+request/result/edge-record shape, and defaults for windows, deadlines, and budgets;
+these await C/D review. Full-video archival is an experimental question, not a
+required storage subsystem. No implementation should treat a proposed decision as
+agreed.
 
 ## Research references
 
