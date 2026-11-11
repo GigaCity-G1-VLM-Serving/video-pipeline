@@ -92,10 +92,16 @@ def test_request_from_pipeline_validates(video):
     )
     again = InferenceRequest.model_validate_json(request.model_dump_json())
     assert again == request
-    assert request.total_bytes == sum(
-        len(base64.b64decode(f.data_b64)) for f in request.frames
-    )
-    assert edge_record(request, prepared, None).selected_capture_ms == prepared.times_ms
+    prefix = "data:image/jpeg;base64,"
+    for frame in request.frames:
+        assert frame.data_ref.startswith(prefix)
+        payload = base64.b64decode(frame.data_ref.removeprefix(prefix), validate=True)
+        assert len(payload) == frame.byte_count
+        assert payload[:2] == b"\xff\xd8"  # JPEG start-of-image marker
+    assert request.query == "Is there a crash?"
+    record = edge_record(request, prepared, 4, None)
+    assert record.selected_capture_ms == prepared.times_ms
+    assert record.frame_budget == 4
 
 
 def test_client_failure_returns_failed_result(video):

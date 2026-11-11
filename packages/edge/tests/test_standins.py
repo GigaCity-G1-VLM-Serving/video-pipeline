@@ -66,6 +66,12 @@ def test_chat_request_interleaves_captions_and_images():
     assert len(content) == 2 * 2 + 1
 
 
+def test_chat_request_without_query_uses_default_question():
+    request = example_request().model_copy(update={"query": None})
+    content = vllm_shim.build_chat_request(request, "m")["messages"][0]["content"]
+    assert content[-1]["text"] == vllm_shim.DEFAULT_QUERY + vllm_shim.ANSWER_SUFFIX
+
+
 @pytest.mark.parametrize(
     ("text", "expected"),
     [

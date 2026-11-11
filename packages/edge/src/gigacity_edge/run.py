@@ -5,7 +5,6 @@ window per budget.
 """
 
 import argparse
-import base64
 import json
 import subprocess
 import sys
@@ -16,12 +15,12 @@ from pathlib import Path
 
 from gigacity_contracts import (
     EdgeRecord,
-    EncodedFrame,
     InferenceRequest,
+    SelectedFrame,
     WindowMetadata,
 )
 from gigacity_edge.client import now_ms, post_request
-from gigacity_edge.frames import encode_jpeg, probe, read_frames_at, resize_for_model
+from gigacity_edge.frames import probe, read_frames_at, selected_frame
 from gigacity_edge.selectors import select
 
 
@@ -29,7 +28,7 @@ from gigacity_edge.selectors import select
 class Prepared:
     duration_ms: int
     times_ms: list[int]
-    frames: list[EncodedFrame]
+    frames: list[SelectedFrame]
     decode_ms: int
     select_ms: int
     encode_ms: int
@@ -42,20 +41,7 @@ def prepare(video: Path, selector: str, budget: int) -> Prepared:
     images = read_frames_at(video, times)
     decode_ms = int((time.perf_counter() - start) * 1000)
     start = time.perf_counter()
-    frames = []
-    for time_ms, image in zip(times, images):
-        small = resize_for_model(image)
-        data = encode_jpeg(small)
-        frames.append(
-            EncodedFrame(
-                capture_ms=time_ms,
-                codec="jpeg",
-                width=small.shape[1],
-                height=small.shape[0],
-                byte_count=len(data),
-                data_b64=base64.b64encode(data).decode("ascii"),
-            )
-        )
+    frames = [selected_frame(t, image) for t, image in zip(times, images)]
     encode_ms = int((time.perf_counter() - start) * 1000)
     return Prepared(duration_ms, times, frames, decode_ms, select_ms, encode_ms)
 
@@ -79,24 +65,26 @@ def build_request(
     return InferenceRequest(
         run_id=run_id,
         window=window,
-        frame_budget=budget,
         frames=prepared.frames,
         total_bytes=sum(frame.byte_count for frame in prepared.frames),
         selector=selector,
-        question=question,
+        query=question,
         sent_at_unix_ms=now_ms(),
     )
 
 
 def edge_record(
-    request: InferenceRequest, prepared: Prepared, round_trip_ms: int | None
+    request: InferenceRequest,
+    prepared: Prepared,
+    budget: int,
+    round_trip_ms: int | None,
 ) -> EdgeRecord:
     return EdgeRecord(
         run_id=request.run_id,
         window=request.window,
         status="sent",
         selector=request.selector,
-        frame_budget=request.frame_budget,
+        frame_budget=budget,
         selected_capture_ms=prepared.times_ms,
         total_bytes=request.total_bytes,
         decode_ms=prepared.decode_ms,
@@ -164,14 +152,14 @@ def main(argv: list[str] | None = None) -> int:
                 args.selector,
                 cache[key],
             )
-            jobs.append((request, cache[key]))
+            jobs.append((request, cache[key], budget))
     prepared_at = now_ms()
 
     def send(job):
-        request, prepared = job
+        request, prepared, budget = job
         request = request.model_copy(update={"sent_at_unix_ms": now_ms()})
         result, round_trip_ms = post_request(args.url, request, args.timeout)
-        return edge_record(request, prepared, round_trip_ms), result
+        return edge_record(request, prepared, budget, round_trip_ms), result
 
     with ThreadPoolExecutor(max_workers=max(1, args.concurrency)) as pool:
         outcomes = list(pool.map(send, jobs))

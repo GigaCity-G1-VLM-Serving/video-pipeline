@@ -17,8 +17,10 @@ endpoint exists. D should rescore with the official evaluator once the manifest 
   images with capture times in the prompt (decision 9). Model revisions are pinned in
   each result's `model_id`.
 - **Code:** `gigacity_edge.run`, `gigacity_edge.standins.vllm_shim`,
-  `gigacity_edge.analysis.score`, `gigacity_edge.bandwidth` at the commit containing
-  this file. Raw outputs are kept out of Git.
+  `gigacity_edge.analysis.score`, `gigacity_edge.bandwidth` at commit `2f36d39` plus
+  the shim User-Agent fix `69e938d`, before the switch to the shared C/D request
+  model. After the switch, the chat payloads sent to vLLM were checked to be
+  byte-identical, so these results still apply. Raw outputs are kept out of Git.
 
 ## 1. Selection and budgets: Qwen2.5-VL-7B-Instruct
 

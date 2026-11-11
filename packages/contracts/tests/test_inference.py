@@ -43,13 +43,15 @@ def request_with(mutate):
         lambda d: d["frames"][0].update(capture_ms=10000),
         lambda d: d["frames"][1].update(capture_ms=1200),
         lambda d: d["frames"][0].update(byte_count=9),
-        lambda d: d["frames"][0].update(data_b64="not base64!"),
-        lambda d: d["frames"][0].update(codec="png"),
+        lambda d: d["frames"][0].update(byte_count=0),
+        lambda d: d["frames"][0].update(data_ref="  "),
+        lambda d: d["frames"][0].update(codec="gif"),
         lambda d: d.update(total_bytes=21),
-        lambda d: d.update(frame_budget=5),
         lambda d: d.update(frames=d["frames"] * 3),
         lambda d: d.update(frames=[]),
-        lambda d: d.update(question="  "),
+        lambda d: d.update(query="  "),
+        lambda d: d.update(budget_id=""),
+        lambda d: d.update(sent_at_unix_ms="1794355200000"),
         lambda d: d.update(answer="yes"),
     ],
 )
@@ -58,9 +60,11 @@ def test_invalid_requests_are_rejected(mutate):
         InferenceRequest.model_validate(request_with(mutate))
 
 
-def test_fewer_frames_than_budget_is_allowed():
-    data = request_with(lambda d: d.update(frame_budget=16))
-    assert len(InferenceRequest.model_validate(data).frames) == 2
+def test_query_budget_and_deadline_are_optional():
+    data = request_with(
+        lambda d: d.update(query=None, budget_id=None, deadline_unix_ms=None)
+    )
+    assert InferenceRequest.model_validate(data).query is None
 
 
 def test_completed_result_requires_parsed_answer():

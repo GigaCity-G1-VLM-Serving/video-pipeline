@@ -21,6 +21,8 @@ from gigacity_edge.standins._http import make_server, unix_ms
 DEFAULT_MODEL = "qwen2.5-vl-7b"
 DEFAULT_MODEL_ID = "qwen2.5-vl-7b-instruct@cc594898 vllm-v0.11.0 ab-test-server"
 ANSWER_SUFFIX = " Answer only Yes or No."
+# Used when a request carries no query (live monitoring, C/D plan section 3.1).
+DEFAULT_QUERY = "Did any traffic collision occur during the shown observation window?"
 
 
 def build_chat_request(request: InferenceRequest, model: str) -> dict:
@@ -36,10 +38,11 @@ def build_chat_request(request: InferenceRequest, model: str) -> dict:
         content.append(
             {
                 "type": "image_url",
-                "image_url": {"url": f"data:image/jpeg;base64,{frame.data_b64}"},
+                "image_url": {"url": frame.data_ref},
             }
         )
-    content.append({"type": "text", "text": request.question + ANSWER_SUFFIX})
+    question = request.query or DEFAULT_QUERY
+    content.append({"type": "text", "text": question + ANSWER_SUFFIX})
     return {
         "model": model,
         "messages": [{"role": "user", "content": content}],

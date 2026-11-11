@@ -27,7 +27,8 @@ date in the same change that implements the decision.
 | 8 | Evidence is JPEG frames; clips are not sent | proposed | Matches milestone 1 and the C/D plan; revisit if bandwidth results favor clips |
 | 9 | Frames reach the model as separate images with capture times in the prompt, not as "video" input | proposed | vLLM's Qwen2.5-VL video path uses one time interval per video and merges frames in pairs (checked in vLLM and Transformers source, November 10). Separate images keep irregular spacing correct |
 | 10 | The edge resizes frames to fit 448×448, keeping aspect ratio, with sides a multiple of 28 (640×360 → 448×252), JPEG quality 85; C applies the same pixel cap so it never resizes again | proposed | Keeps edge byte counts equal to what C receives; about 144 visual tokens per frame |
-| 11 | B sends HTTP JSON with inline base64 to C's service, which owns the prompt and calls vLLM | proposed | Draft `InferenceRequest` in `gigacity_contracts.inference` |
+| 11 | The B → C request is C/D's shared `InferenceRequest`/`SelectedFrame`; B sends it as HTTP JSON to C's service, which owns the prompt and calls vLLM | proposed by C/D, adopted by A/B; awaiting team sign-off | C/D `feature/shared-contracts`, adopted by A/B November 11; its own open questions still apply. Proposed v1 transport: `data_ref` is an inline base64 data URI |
+| 11a | The request carries no frame budget; fixed budgets are recorded in `EdgeRecord.frame_budget` and the window ID, and C-issued budgets via `budget_id` | proposed | Gap noted when adopting the shared request; revisit with the budget protocol (#19) |
 | 12 | Prompt: "Frame i at t s:" before each image, then the question and "Answer only Yes or No."; temperature 0, at most 16 output tokens | proposed | Must be identical across selectors and budgets |
 
 ## Records and evaluation

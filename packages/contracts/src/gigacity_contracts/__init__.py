@@ -2,16 +2,16 @@
 
 from gigacity_contracts.inference import (
     EdgeRecord,
-    EncodedFrame,
     InferenceRequest,
     InferenceResult,
+    SelectedFrame,
 )
 from gigacity_contracts.windows import WindowMetadata
 
 __all__ = [
-    "EdgeRecord",
-    "EncodedFrame",
+    "WindowMetadata",
+    "SelectedFrame",
     "InferenceRequest",
     "InferenceResult",
-    "WindowMetadata",
+    "EdgeRecord",
 ]

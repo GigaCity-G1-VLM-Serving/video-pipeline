@@ -33,27 +33,30 @@ schema = WindowMetadata.model_json_schema()
 The example contains synthetic metadata only. It is not a model prediction or a
 measurement. Invalid inputs and serialization round-trips are exercised in tests.
 
-## Proposed: inference handoff and per-window records
+## Draft: inference request, result, and per-window records
 
-**Status: A/B proposal awaiting C/D review.** Draft models live in
-`gigacity_contracts.inference`; rationale and status are in [decisions](decisions.md).
-C/D's November 3 plan sketches a different request shape (seconds, `request_id`);
-these models are the A/B counter-proposal, not an agreed API.
+**Status: draft.** Models live in `gigacity_contracts.inference`; rationale and status
+are in [decisions](decisions.md).
 
-`InferenceRequest` (B → C), one per window ([example](examples/inference_request.json)):
+`InferenceRequest` and `SelectedFrame` (B → C) are C/D's shared request from
+`feature/shared-contracts`, documented field by field in
+[`b_to_c.md`](../packages/contracts/src/gigacity_contracts/b_to_c.md)
+([example](examples/inference_request.json)). A/B have adopted them unchanged:
 
-- `run_id`; `window`: a `WindowMetadata`, whose `window_id` is also the request ID.
-- `frame_budget`: 4, 8, or 16. Fewer frames than the budget is allowed; more is not.
-- `frames`: JPEG `EncodedFrame`s with `capture_ms` (source-video time), size, and
-  `byte_count`, which must equal the decoded length of `data_b64` (inline base64).
-  Capture times strictly increase and fall inside `[start_ms, end_ms)`.
-- `total_bytes`: sum of frame bytes, i.e. the payload that crossed the link.
-- `selector`, `question`, optional `deadline_ms_after_window_end`, `sent_at_unix_ms`.
+- `window.window_id` doubles as the request ID; `query` carries the question.
+- **Proposed v1 transport:** `data_ref` holds an inline data URI
+  (`data:image/jpeg;base64,...`), which C can pass straight to vLLM as an image URL.
+  The model does not check `byte_count` against the payload; A/B's edge tests do.
+- The request has no frame budget field. For fixed-budget runs `budget_id` is null and
+  the budget is recorded in `EdgeRecord.frame_budget` and the window ID.
 
 The request carries frames, not clips. C passes them to the model as **separate
 images** with their capture times in the prompt, not as model "video" input: for
 Qwen2.5-VL, video input assumes evenly spaced frames and would distort selected,
 irregularly spaced frames. See [decisions](decisions.md).
+
+`InferenceResult` and `EdgeRecord` are A/B proposals awaiting C/D review; the shared
+request does not define a response yet.
 
 `InferenceResult` (C → B/D, [example](examples/inference_result.json)): `status` is
 `completed`, `rejected`, `failed`, or `late`; completed results require a parsed

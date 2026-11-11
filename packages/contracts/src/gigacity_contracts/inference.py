@@ -1,14 +1,19 @@
-"""Proposed B -> C inference handoff and per-window records (draft, not agreed).
+"""Edge-to-central inference contracts (draft).
 
-These models encode the A/B proposal recorded in ``docs/decisions.md``: JPEG frames
-sent as separate images with source-video capture times. C/D review is pending.
+`SelectedFrame` and `InferenceRequest` are the shared B -> C request from C/D's
+`feature/shared-contracts` proposal. `InferenceResult` (C -> B/D) and `EdgeRecord`
+(B -> D) are A/B proposals for the parts that request does not cover yet.
 """
 
-import base64
-import binascii
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from gigacity_contracts.windows import WindowMetadata
 
@@ -26,57 +31,79 @@ def _not_blank(value: str) -> str:
     return value
 
 
-class EncodedFrame(BaseModel):
-    """One selected frame, JPEG-encoded at the edge."""
+class SelectedFrame(BaseModel):
+    """One encoded image selected by the edge device."""
 
-    model_config = _STRICT
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
     capture_ms: int = Field(ge=0)
-    codec: Literal["jpeg"]
+    codec: Literal["jpeg", "png", "webp"]
     width: int = Field(gt=0)
     height: int = Field(gt=0)
     byte_count: int = Field(gt=0)
-    data_b64: str = Field(min_length=1)
+    data_ref: str = Field(min_length=1)
 
-    @model_validator(mode="after")
-    def byte_count_matches_payload(self) -> Self:
-        try:
-            decoded = base64.b64decode(self.data_b64, validate=True)
-        except binascii.Error as error:
-            raise ValueError("data_b64 must be valid base64") from error
-        if len(decoded) != self.byte_count:
-            raise ValueError("byte_count must equal the decoded payload length")
-        return self
+    @field_validator("data_ref")
+    @classmethod
+    def data_ref_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("data_ref must not be blank")
+        return value
 
 
 class InferenceRequest(BaseModel):
-    """B -> C: selected evidence and the question for one window."""
+    """One request from an edge device to the central inference service."""
 
-    model_config = _STRICT
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
     run_id: str = Field(min_length=1)
     window: WindowMetadata
-    frame_budget: FrameBudget
-    frames: list[EncodedFrame] = Field(min_length=1)
-    total_bytes: int = Field(gt=0)
+    frames: list[SelectedFrame] = Field(min_length=1)
+    total_bytes: int = Field(ge=0)
     selector: str = Field(min_length=1)
-    question: str = Field(min_length=1)
-    deadline_ms_after_window_end: int | None = Field(default=None, ge=0)
+    budget_id: str | None = None
+    query: str | None = None
+    deadline_unix_ms: int | None = Field(default=None, ge=0)
     sent_at_unix_ms: int = Field(ge=0)
 
-    _blank_check = field_validator("run_id", "selector", "question")(_not_blank)
+    @field_validator("run_id", "selector")
+    @classmethod
+    def required_strings_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("value must not be blank")
+        return value
+
+    @field_validator("budget_id", "query")
+    @classmethod
+    def optional_strings_must_not_be_blank(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("value must not be blank when provided")
+        return value
 
     @model_validator(mode="after")
-    def frames_are_consistent(self) -> Self:
-        if len(self.frames) > self.frame_budget:
-            raise ValueError("frames must not exceed frame_budget")
-        times = [frame.capture_ms for frame in self.frames]
-        if any(later <= earlier for earlier, later in zip(times, times[1:])):
-            raise ValueError("capture_ms must be strictly increasing")
-        if any(not self.window.start_ms <= t < self.window.end_ms for t in times):
-            raise ValueError("capture_ms must fall inside [start_ms, end_ms)")
-        if self.total_bytes != sum(frame.byte_count for frame in self.frames):
-            raise ValueError("total_bytes must equal the sum of frame byte_count")
+    def validate_evidence(self) -> Self:
+        start_ms = self.window.start_ms
+        end_ms = self.window.end_ms
+        timestamps = [frame.capture_ms for frame in self.frames]
+
+        if any(ts < start_ms or ts >= end_ms for ts in timestamps):
+            raise ValueError(
+                "all frame timestamps must fall inside [window.start_ms, window.end_ms)"
+            )
+
+        if any(
+            current >= following
+            for current, following in zip(timestamps, timestamps[1:])
+        ):
+            raise ValueError("frame timestamps must be strictly increasing")
+
+        expected_bytes = sum(frame.byte_count for frame in self.frames)
+        if self.total_bytes != expected_bytes:
+            raise ValueError(
+                "total_bytes must equal the sum of frame byte_count "
+                f"(expected {expected_bytes}, got {self.total_bytes})"
+            )
+
         return self
 
 

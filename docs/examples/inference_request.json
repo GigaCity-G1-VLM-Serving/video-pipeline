@@ -7,7 +7,6 @@
     "start_ms": 0,
     "end_ms": 10000
   },
-  "frame_budget": 4,
   "frames": [
     {
       "capture_ms": 1200,
@@ -15,7 +14,7 @@
       "width": 448,
       "height": 252,
       "byte_count": 8,
-      "data_b64": "AAECAwQFBgc="
+      "data_ref": "data:image/jpeg;base64,AAECAwQFBgc="
     },
     {
       "capture_ms": 7400,
@@ -23,12 +22,13 @@
       "width": 448,
       "height": 252,
       "byte_count": 12,
-      "data_b64": "CAkKCwwNDg8QERIT"
+      "data_ref": "data:image/jpeg;base64,CAkKCwwNDg8QERIT"
     }
   ],
   "total_bytes": 20,
   "selector": "motion-v1",
-  "question": "Did any traffic collision occur during the shown observation window?",
-  "deadline_ms_after_window_end": 5000,
+  "budget_id": null,
+  "query": "Did any traffic collision occur during the shown observation window?",
+  "deadline_unix_ms": 1794355215000,
   "sent_at_unix_ms": 1794355200000
 }

@@ -6,7 +6,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from gigacity_contracts import EncodedFrame
+from gigacity_contracts import SelectedFrame
 
 MAX_SIDE = 448
 PATCH = 28
@@ -79,22 +79,28 @@ def encode_jpeg(image: np.ndarray, quality: int = JPEG_QUALITY) -> bytes:
     return buffer.tobytes()
 
 
+def data_uri(data: bytes) -> str:
+    """Inline JPEG payload for SelectedFrame.data_ref (proposed v1 transport)."""
+    return "data:image/jpeg;base64," + base64.b64encode(data).decode("ascii")
+
+
+def selected_frame(time_ms: int, image: np.ndarray, quality: int = JPEG_QUALITY):
+    """Resize and JPEG-encode one decoded frame as a contract SelectedFrame."""
+    small = resize_for_model(image)
+    data = encode_jpeg(small, quality)
+    return SelectedFrame(
+        capture_ms=time_ms,
+        codec="jpeg",
+        width=small.shape[1],
+        height=small.shape[0],
+        byte_count=len(data),
+        data_ref=data_uri(data),
+    )
+
+
 def encode_frames(
     path: str | Path, times_ms: list[int], quality: int = JPEG_QUALITY
-) -> list[EncodedFrame]:
+) -> list[SelectedFrame]:
     """Decode, resize, and encode frames at times_ms as contract frames."""
-    frames = []
-    for time_ms, image in zip(times_ms, read_frames_at(path, times_ms)):
-        small = resize_for_model(image)
-        data = encode_jpeg(small, quality)
-        frames.append(
-            EncodedFrame(
-                capture_ms=time_ms,
-                codec="jpeg",
-                width=small.shape[1],
-                height=small.shape[0],
-                byte_count=len(data),
-                data_b64=base64.b64encode(data).decode("ascii"),
-            )
-        )
-    return frames
+    images = read_frames_at(path, times_ms)
+    return [selected_frame(t, image, quality) for t, image in zip(times_ms, images)]
