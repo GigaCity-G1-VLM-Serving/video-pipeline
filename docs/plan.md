@@ -59,6 +59,9 @@ selection at 4, 8, and 16 frames on a pilot set.
   annotated crash. A/B propose Qwen3-VL-30B-A3B after the November 11 screen
   ([results](results/2026-11-11-model-and-selector-screen.md)); needs team agreement.
 - Selector gains (CLIP-generic best at 8 frames) are within noise on 160 questions.
+- A Yes threshold and two prompt variants did not improve held-out accuracy; see
+  [results](results/2026-11-11-threshold-and-prompts.md). Remaining errors are mostly
+  the model failing to tell, plus questions about events outside the annotation.
 - C's serving endpoint and mentor confirmation of vLLM.
 - HTV videos need a Kaggle API key; the pilot starts with Accident-Bench only.
 - D's official manifest and verified windows.
