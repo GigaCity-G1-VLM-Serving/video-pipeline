@@ -56,8 +56,9 @@ selection at 4, 8, and 16 frames on a pilot set.
 ## Blocked or waiting
 
 - Model choice: Qwen2.5-VL-7B rarely answers Yes on crash videos even with frames on the
-  annotated crash; see [results](results/2026-11-10-whole-video-pilot.md). Selector
-  comparisons are not meaningful until the model or prompt can recognise collisions.
+  annotated crash. A/B propose Qwen3-VL-30B-A3B after the November 11 screen
+  ([results](results/2026-11-11-model-and-selector-screen.md)); needs team agreement.
+- Selector gains (CLIP-generic best at 8 frames) are within noise on 160 questions.
 - C's serving endpoint and mentor confirmation of vLLM.
 - HTV videos need a Kaggle API key; the pilot starts with Accident-Bench only.
 - D's official manifest and verified windows.

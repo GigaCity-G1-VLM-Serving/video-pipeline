@@ -15,6 +15,7 @@ date in the same change that implements the decision.
 | 1 | First workload is traffic collisions; recorded videos are replayed causally as simulated live cameras | agreed | October 27 meeting |
 | 2 | Primary dataset is NVIDIA TAR; MetroSurv blocked (videos unreleased); DeepAccident is a backup | agreed | Dataset evaluation, October 2026 |
 | 3 | Central model is Qwen2.5-VL-7B-Instruct with frozen weights | agreed | Pilot, proposal, and C/D plan |
+| 3a | Switch the central model to Qwen3-VL-30B-A3B-Instruct (FP8, about 30 GB, needs an Ada or Hopper GPU for FP8) | proposed | A/B screen, November 11: best crash recall without losing "No" accuracy; see [results](results/2026-11-11-model-and-selector-screen.md) |
 | 4 | Milestone 1 is end-to-end whole-video QA; per-window monitoring follows | agreed | Mentor comment on the C/D plan, November 8 |
 | 5 | Edge devices are simulated (Orin Nano Super class, ~5 Mbit/s uplink, 4 cameras per node, stressed to 8 and 12) | proposed | A/B answer to C/D open question 6 |
 | 6 | Server load is reported as concurrent requests (1, 2, 4, 8, 16); camera count measures edge capacity only | proposed | Team comment on the C/D plan |
