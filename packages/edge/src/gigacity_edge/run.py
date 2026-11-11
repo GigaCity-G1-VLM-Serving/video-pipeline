@@ -21,7 +21,7 @@ from gigacity_contracts import (
 )
 from gigacity_edge.client import now_ms, post_request
 from gigacity_edge.frames import probe, read_frames_at, selected_frame
-from gigacity_edge.selectors import select
+from gigacity_edge.selectors import SELECTORS, select
 
 
 @dataclass(frozen=True)
@@ -34,9 +34,11 @@ class Prepared:
     encode_ms: int
 
 
-def prepare(video: Path, selector: str, budget: int) -> Prepared:
+def prepare(
+    video: Path, selector: str, budget: int, query: str | None = None
+) -> Prepared:
     duration_ms, _, _ = probe(video)
-    times, select_ms = select(selector, video, budget, duration_ms)
+    times, select_ms = select(selector, video, budget, duration_ms, query)
     start = time.perf_counter()
     images = read_frames_at(video, times)
     decode_ms = int((time.perf_counter() - start) * 1000)
@@ -120,7 +122,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pilot", type=Path, required=True)
     parser.add_argument("--videos", type=Path, required=True)
-    parser.add_argument("--selector", choices=["uniform", "motion"], required=True)
+    parser.add_argument("--selector", choices=list(SELECTORS), required=True)
     parser.add_argument("--budgets", type=int, nargs="+", default=[4, 8, 16])
     parser.add_argument("--url", required=True)
     parser.add_argument("--run-id", required=True)
@@ -132,7 +134,7 @@ def main(argv: list[str] | None = None) -> int:
 
     started = now_ms()
     rows = load_pilot(args.pilot, args.limit)
-    cache: dict[tuple[str, int], Prepared] = {}
+    cache: dict[tuple[str, int, str | None], Prepared] = {}
     jobs, missing = [], []
     for row in rows:
         video = args.videos / row["video_id"]
@@ -140,9 +142,11 @@ def main(argv: list[str] | None = None) -> int:
             missing.append(row["video_id"])
             continue
         for budget in args.budgets:
-            key = (row["video_id"], budget)
+            # Query-aware selection differs per question on the same video.
+            per_question = args.selector == "clip"
+            key = (row["video_id"], budget, row["question"] if per_question else None)
             if key not in cache:
-                cache[key] = prepare(video, args.selector, budget)
+                cache[key] = prepare(video, args.selector, budget, row["question"])
             request = build_request(
                 args.run_id,
                 row["question_id"],

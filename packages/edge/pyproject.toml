@@ -10,6 +10,12 @@ dependencies = [
     "opencv-python-headless>=5.0.0.93",
 ]
 
+[project.optional-dependencies]
+clip = [
+    "onnxruntime>=1.31.0,<1.31.1",
+    "tokenizers>=0.23.3,<0.24",
+]
+
 [build-system]
 requires = ["hatchling>=1.26"]
 build-backend = "hatchling.build"
