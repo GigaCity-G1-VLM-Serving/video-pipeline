@@ -1,0 +1,6 @@
+concurrency,requests,completed,throughput_req_per_s,p50_round_trip_ms,p95_round_trip_ms,model_id
+1,50,50,1.544,628,855,qwen2.5-vl-7b-instruct@cc594898 vllm-v0.11.0 ab-test-server
+2,50,50,2.316,825,1248,qwen2.5-vl-7b-instruct@cc594898 vllm-v0.11.0 ab-test-server
+4,50,50,3.01,1312,1829,qwen2.5-vl-7b-instruct@cc594898 vllm-v0.11.0 ab-test-server
+8,50,50,3.573,2030,3423,qwen2.5-vl-7b-instruct@cc594898 vllm-v0.11.0 ab-test-server
+16,50,50,3.526,3952,5851,qwen2.5-vl-7b-instruct@cc594898 vllm-v0.11.0 ab-test-server

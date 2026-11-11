@@ -9,6 +9,7 @@ Run: VLLM_API_KEY=... python -m gigacity_edge.standins.vllm_shim \
 
 import argparse
 import json
+import math
 import os
 import string
 import time
@@ -24,10 +25,38 @@ ANSWER_SUFFIX = " Answer only Yes or No."
 # Used when a request carries no query (live monitoring, C/D plan section 3.1).
 DEFAULT_QUERY = "Did any traffic collision occur during the shown observation window?"
 
+# Prompt variants. "v1" is the November 10-11 prompt and must stay unchanged.
+PROMPT_VARIANTS: dict[str, dict[str, str | None]] = {
+    "v1": {"preamble": None, "suffix": ANSWER_SUFFIX},
+    "v2-context": {
+        "preamble": "These are frames from a fixed traffic CCTV camera, in time order.",
+        "suffix": ANSWER_SUFFIX,
+    },
+    "v3-careful": {
+        "preamble": None,
+        "suffix": " Look carefully at every frame for any collision or crash, even "
+        "brief or partly visible. Answer only Yes or No.",
+    },
+}
+TOP_LOGPROBS = 20
 
-def build_chat_request(request: InferenceRequest, model: str) -> dict:
-    """OpenAI chat payload: interleaved frame captions and images, then the question."""
+
+def build_chat_request(
+    request: InferenceRequest,
+    model: str,
+    variant: str = "v1",
+    logprobs: bool = False,
+) -> dict:
+    """OpenAI chat payload: interleaved frame captions and images, then the question.
+
+    With the defaults the payload is identical to the November 10-11 runs.
+    ``logprobs`` only asks vLLM to report token probabilities; with temperature 0 it
+    does not change the generated answer.
+    """
+    prompt = PROMPT_VARIANTS[variant]
     content: list[dict] = []
+    if prompt["preamble"]:
+        content.append({"type": "text", "text": prompt["preamble"]})
     for index, frame in enumerate(request.frames, start=1):
         content.append(
             {
@@ -42,13 +71,17 @@ def build_chat_request(request: InferenceRequest, model: str) -> dict:
             }
         )
     question = request.query or DEFAULT_QUERY
-    content.append({"type": "text", "text": question + ANSWER_SUFFIX})
-    return {
+    content.append({"type": "text", "text": question + prompt["suffix"]})
+    payload = {
         "model": model,
         "messages": [{"role": "user", "content": content}],
         "temperature": 0,
         "max_tokens": 16,
     }
+    if logprobs:
+        payload["logprobs"] = True
+        payload["top_logprobs"] = TOP_LOGPROBS
+    return payload
 
 
 def parse_answer(text: str | None) -> str:
@@ -58,6 +91,23 @@ def parse_answer(text: str | None) -> str:
         return "unparsed"
     first = words[0].strip(string.punctuation)
     return first if first in ("yes", "no") else "unparsed"
+
+
+def yes_probability(response: dict) -> float | None:
+    """P(yes) / (P(yes) + P(no)) from the first generated token's top logprobs."""
+    try:
+        first = response["choices"][0]["logprobs"]["content"][0]
+        candidates = first.get("top_logprobs") or [first]
+    except (KeyError, IndexError, TypeError):
+        return None
+    totals = {"yes": 0.0, "no": 0.0}
+    for candidate in candidates:
+        word = str(candidate.get("token", "")).strip().strip(string.punctuation).lower()
+        if word in totals and candidate.get("logprob") is not None:
+            totals[word] += math.exp(candidate["logprob"])
+    if totals["yes"] <= 0 or totals["no"] <= 0:
+        return None
+    return totals["yes"] / (totals["yes"] + totals["no"])
 
 
 def call_vllm(url: str, api_key: str | None, payload: dict, timeout_s: float) -> dict:
@@ -84,8 +134,10 @@ def shim_result(
     model: str = DEFAULT_MODEL,
     model_id: str = DEFAULT_MODEL_ID,
     timeout_s: float = 120.0,
+    variant: str = "v1",
+    logprobs: bool = True,
 ) -> InferenceResult:
-    payload = build_chat_request(request, model)
+    payload = build_chat_request(request, model, variant, logprobs)
     started = time.perf_counter()
     common = {
         "run_id": request.run_id,
@@ -113,6 +165,7 @@ def shim_result(
         status="completed",
         answer_text=text,
         answer=parse_answer(text),
+        yes_probability=yes_probability(response),
         prompt_tokens=usage.get("prompt_tokens"),
         completion_tokens=usage.get("completion_tokens"),
         inference_duration_ms=round((time.perf_counter() - started) * 1000),
@@ -127,12 +180,21 @@ def build_server(
     port: int = 8200,
     model: str = DEFAULT_MODEL,
     model_id: str = DEFAULT_MODEL_ID,
+    variant: str = "v1",
+    logprobs: bool = True,
 ) -> ThreadingHTTPServer:
     return make_server(
         host,
         port,
         lambda request, received: shim_result(
-            request, received, vllm_url, api_key, model, model_id
+            request,
+            received,
+            vllm_url,
+            api_key,
+            model,
+            model_id,
+            variant=variant,
+            logprobs=logprobs,
         ),
     )
 
@@ -144,14 +206,25 @@ def main() -> None:
     parser.add_argument("--vllm-url", required=True)
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--model-id", default=DEFAULT_MODEL_ID)
+    parser.add_argument(
+        "--prompt-variant", choices=sorted(PROMPT_VARIANTS), default="v1"
+    )
+    parser.add_argument(
+        "--no-logprobs", action="store_true", help="do not request token logprobs"
+    )
     args = parser.parse_args()
+    model_id = args.model_id
+    if args.prompt_variant != "v1":
+        model_id = f"{model_id} prompt={args.prompt_variant}"
     server = build_server(
         args.vllm_url,
         os.environ.get("VLLM_API_KEY"),
         args.host,
         args.port,
         args.model,
-        args.model_id,
+        model_id,
+        variant=args.prompt_variant,
+        logprobs=not args.no_logprobs,
     )
     print(f"vllm-shim (A/B test server) on http://{args.host}:{server.server_port}")
     server.serve_forever()

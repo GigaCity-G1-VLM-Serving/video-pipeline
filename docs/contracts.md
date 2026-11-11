@@ -63,6 +63,8 @@ request does not define a response yet.
 `answer` (`yes`, `no`, `unparsed`) and may include raw text, token counts, queue and
 inference durations, and wall-clock receipt/completion times. `is_synthetic` marks
 mock or stand-in servers so they are never mistaken for C's serving measurements.
+Optional `yes_probability` is P(yes) / (P(yes) + P(no)) from the first answer token,
+so evaluation can set a Yes threshold on calibration data instead of using raw text.
 
 `EdgeRecord` (B → D, [example](examples/edge_record.json)): one per window, including
 windows that were never sent (`dropped`, `skipped`) or sent partially

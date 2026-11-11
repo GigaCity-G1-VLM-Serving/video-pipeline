@@ -4,6 +4,7 @@
   "status": "completed",
   "answer_text": "No",
   "answer": "no",
+  "yes_probability": 0.12,
   "model_id": "synthetic-model",
   "frames_used": 2,
   "prompt_tokens": 350,

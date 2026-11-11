@@ -96,6 +96,32 @@ def edge_record(
     )
 
 
+# Bump when selector behaviour changes, so run.json says which selectors produced it.
+SELECTOR_VERSION = "2026-11-11"
+
+
+SECRET_KEYS = {"api_key", "apikey", "token", "access_token", "secret", "password"}
+
+
+def _secret_keys(value) -> list[str]:
+    if isinstance(value, dict):
+        found = [k for k in value if str(k).lower() in SECRET_KEYS]
+        return found + [k for v in value.values() for k in _secret_keys(v)]
+    if isinstance(value, list):
+        return [k for v in value for k in _secret_keys(v)]
+    return []
+
+
+def load_server_config(path: Path | None) -> dict | None:
+    """Server description for run.json. It must not contain secrets."""
+    if path is None:
+        return None
+    config = json.loads(path.read_text(encoding="utf-8"))
+    if found := _secret_keys(config):
+        raise ValueError(f"server config has secret-looking keys: {found}")
+    return config
+
+
 def git_commit() -> str | None:
     try:
         out = subprocess.run(
@@ -130,6 +156,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--concurrency", type=int, default=1)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--timeout", type=float, default=300.0)
+    parser.add_argument(
+        "--server-config",
+        type=Path,
+        default=None,
+        help="JSON describing the server (GPU, image, flags); copied into run.json",
+    )
     args = parser.parse_args(argv)
 
     started = now_ms()
@@ -189,6 +221,9 @@ def main(argv: list[str] | None = None) -> int:
         "requests": len(jobs),
         "statuses": statuses,
         "missing_videos": missing,
+        "pilot": str(args.pilot),
+        "selector_version": SELECTOR_VERSION,
+        "server": load_server_config(args.server_config),
     }
     (args.out / "run.json").write_text(json.dumps(summary, indent=2) + "\n")
     print(json.dumps({k: summary[k] for k in ("requests", "statuses")}))

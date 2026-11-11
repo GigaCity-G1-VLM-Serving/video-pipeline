@@ -117,6 +117,8 @@ class InferenceResult(BaseModel):
     status: InferenceStatus
     answer_text: str | None = None
     answer: ParsedAnswer | None = None
+    # P(yes) / (P(yes) + P(no)) from the first answer token, when the server reports it.
+    yes_probability: float | None = Field(default=None, ge=0, le=1)
     model_id: str = Field(min_length=1)
     frames_used: int = Field(ge=0)
     prompt_tokens: int | None = Field(default=None, ge=0)
