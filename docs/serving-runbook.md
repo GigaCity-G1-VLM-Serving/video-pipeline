@@ -1,259 +1,183 @@
 # C serving runbook (proposed)
 
-**Status: proposed, not yet validated on a GPU.** This records the intended
-Milestone 1 deployment for workstream C so settings are pinned and reproducible
-before baseline numbers are collected. Record the versions and prices you
-actually encountered; the figures below were read from vendor pages, not from a
-run of our own.
+**Status: proposed, not yet run on a GPU.** Settings here are pinned to match the
+decision log and A/B's published runs so C's numbers are comparable with theirs.
 
-Goal of one pass through this runbook: the model loads, a 10-second window of
-real traffic footage produces a logged Yes/No answer, and we have latency,
-token counts, and byte counts for the 4/8/16 frame budgets.
+## What this measures, and why it is not a repeat of A/B's work
 
----
+A/B have published three result sets. Every one of them carries the line
+"A/B test-server results, not C's serving measurements," and the reasons are
+stated in those docs: latencies include the RunPod proxy round trip, and in the
+November 11 screen three selectors ran in parallel, so "latencies are not load
+measurements."
 
-## 0. Before you touch a GPU
+The only serving-load numbers that exist are for Qwen2.5-VL-7B on an A40
+(November 10, section 4). A/B now propose Qwen3-VL-30B-A3B as the primary model.
+**No load characterisation exists for the proposed model**, and that is C's
+workstream:
 
-**Accounts.** A RunPod account with credit. No Hugging Face token is needed:
-neither Qwen2.5-VL-7B-Instruct nor the TAR annotations are gated. A Kaggle
-account with `~/.kaggle/kaggle.json` is needed only if the video source you
-pick is Kaggle-hosted.
+- latency and time-to-first-token per frame budget, measured server-side
+- throughput and queueing against concurrent requests
+- deadline compliance at the 5 s deadline of decision 18
+- cameras supported per GPU
+- prompt tokens per budget, which is the real GPU cost the controller trades against
 
-**Cost.** RunPod bills per second with a one-minute minimum. An A100 80GB runs
-roughly $1.19–1.79/hr depending on tier and variant; storage is billed
-separately per GB-month. A first pass through this runbook is a couple of
-hours. The expensive mistake is leaving a pod running overnight, so read
-section 10 before section 1.
+This also matters for whether C's contribution exists at all. Under
+Qwen2.5-VL-7B, accuracy did not improve with more frames, so a frame budget had
+nothing to optimise. Under Qwen3-VL-30B-A3B, uniform accuracy rises 60 → 63 → 68%
+at 4 → 8 → 16 frames. The quality-versus-cost curve is real again, and the cost
+half of it is unmeasured.
 
-**Debug cheap, measure on target.** Qwen2.5-VL-7B in bfloat16 is about 16 GB of
-weights, so it fits on much smaller cards. If the pipeline is still being
-debugged, do that on a cheaper GPU and switch to the A100 only for the numbers
-that get reported. Never mix the two in one results file.
+## 0. Before deploying
 
----
+**GPU.** Qwen3-VL-30B-A3B-FP8 needs about 30 GB and, per A/B's note, an **Ada or
+Hopper** card for FP8. The A100 in the original plan is Ampere and does not
+qualify. Use an **L40S 48 GB** ($1.09/hr) — Ada, enough memory, and A/B already
+ran this model on one, so the numbers cross-check.
 
-## 1. Create the network volume first
+**Cost.** Per-second billing, one-minute minimum. A/B's three runs cost about
+$4.40 in total. Budget one to two hours.
 
-A network volume is disk that outlives the pod. Without one, the 16 GB model
-download repeats on every launch.
+**Deviation to record.** Decision 7 pins the container image
+`vllm/vllm-openai:v0.11.0`. This runbook installs `vllm==0.11.0` into a PyTorch
+template instead, which is the same vLLM version on a different base image.
+Report that in results; switch to the image itself if any number looks off.
 
-Storage → Network Volumes → create one of about 60 GB. Note its datacenter.
+## 1. Deploy the pod
 
-Two constraints that cause most first-time failures: a volume is pinned to one
-datacenter and the pod must be launched in that same datacenter, and a volume
-is attached at pod creation and cannot be attached to a pod that is already
-running. Decide on the volume before deploying.
+Pods → Deploy. No network volume — the pod's own volume disk at `/workspace`
+persists while the pod exists, including while stopped.
 
-## 2. Deploy the pod
+- **GPU:** L40S 48 GB
+- **Template:** RunPod PyTorch
+- **Volume disk:** 80 GB (the model is ~30 GB)
+- **Container disk:** 40 GB
+- **Expose HTTP Ports:** empty
+- **Region:** any
 
-Pods → Deploy. Set:
+Do not set RunPod's `allowedCudaVersions` filter. Decision 7 records that pod
+creation failed whenever it was set.
 
-- **GPU:** A100 80GB, in the volume's datacenter.
-- **Template:** a RunPod PyTorch image (CUDA preinstalled).
-- **Network volume:** the one from section 1; it mounts at `/workspace`.
-- **Expose HTTP ports:** leave empty for now. See section 6 on why.
-
-Deploy, then open the pod's web terminal, or connect over SSH.
-
-## 3. Confirm the GPU and persist the model cache
-
-```bash
-nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv
-df -h /workspace
-```
-
-Point the Hugging Face cache at the volume so weights survive a restart. Put
-this in `~/.bashrc` as well, or it is lost on reconnect:
+## 2. Install
 
 ```bash
 export HF_HOME=/workspace/hf
 echo 'export HF_HOME=/workspace/hf' >> ~/.bashrc
-```
 
-## 4. Install vLLM, ffmpeg, uv, and the repo
+apt-get update && apt-get install -y ffmpeg tmux git
+pip install vllm==0.11.0
 
-```bash
-pip install -U vllm
-apt-get update && apt-get install -y ffmpeg tmux
 curl -LsSf https://astral.sh/uv/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
-
-cd /workspace
-git clone https://github.com/GigaCity-G1-VLM-Serving/video-pipeline
-cd video-pipeline && uv sync --locked
-
 python -c "import vllm, torch; print(vllm.__version__, torch.__version__)"
+nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv
 ```
 
-Record the vLLM version, torch version, and driver in the run log. The serving
-engine is not a research variable, so pin one version and one set of inference
-settings for everything reported.
-
-## 5. Start the server
-
-Run it under `tmux` so it survives a dropped connection:
+## 3. Start the server
 
 ```bash
 tmux new -s vllm
 
-vllm serve Qwen/Qwen2.5-VL-7B-Instruct \
+vllm serve Qwen/Qwen3-VL-30B-A3B-Instruct-FP8 \
   --host 0.0.0.0 --port 8000 \
-  --dtype bfloat16 \
   --max-model-len 16384 \
   --gpu-memory-utilization 0.90 \
   --limit-mm-per-prompt '{"image":16,"video":0}' \
-  --mm-processor-kwargs '{"min_pixels":50176,"max_pixels":1003520}' \
+  --no-enable-prefix-caching \
   --seed 0
 ```
 
-Detach with `Ctrl-b` then `d`; reattach with `tmux attach -t vllm`. First launch
-downloads about 16 GB, so expect several minutes; later launches read the volume
-cache and start in well under a minute.
+Detach with `Ctrl-b` then `d`. First launch downloads ~30 GB.
 
-Two flags carry experimental weight and must not be left at defaults:
+Prefix caching is off to match decision 7 and A/B's runs — leaving it on would
+make repeated identical payloads look artificially fast, which is exactly the
+wrong thing when measuring serving load.
 
-- `--limit-mm-per-prompt` caps images per request. The default is well below 16,
-  so a 16-frame budget is rejected outright without it. Older vLLM builds take
-  the `image=16` form instead of JSON; use whichever the installed version
-  accepts and record which.
-- `--mm-processor-kwargs` bounds per-image resolution. Qwen2.5-VL uses dynamic
-  resolution, so without a cap a 1080p frame and a 480p frame produce different
-  token counts. TAR videos come from eight source collections at mixed
-  resolutions, so leaving this unset makes latency partly a function of source
-  resolution rather than of frame budget, and the 4/8/16 comparison stops being
-  controlled. `max_pixels` of 1003520 is about 320 visual tokens per image, so a
-  16-frame window costs roughly 5k tokens and fits the context above.
+No resolution flag is needed here: the client resizes to 448×252 before sending
+(decision 10), so the server receives frames already at the pinned size.
 
-Resolution is itself a confound worth measuring once: repeat one budget sweep at
-a lower `max_pixels` to show whether collision answers are resolution-sensitive
-before fixing a value for the reported runs.
+## 4. Code and videos
 
-## 6. Confirm it loaded
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+cd /workspace
+git clone https://github.com/GigaCity-G1-VLM-Serving/video-pipeline
+cd video-pipeline && git checkout feat/central-serving-smoke && uv sync --locked
 
-Wait for `Application startup complete` in the server log, then from a second
-shell on the same pod:
+cd /workspace
+hf download Open-Space-Reasoning/AccidentBench --repo-type dataset \
+  land_space/long/videos/000001.mp4 \
+  land_space/long/videos/000025.mp4 \
+  land_space/medium/videos/xWQgF70Imy4.mp4 \
+  --local-dir /workspace/videos/Accident-Bench
+```
+
+Three videos is enough. This measures serving cost, not answer quality, so the
+payloads only need to be realistic — 448×252 JPEGs at quality 85, which the
+client produces.
+
+## 5. Wait for the server
 
 ```bash
 curl -s localhost:8000/health -o /dev/null -w '%{http_code}\n'
 curl -s localhost:8000/v1/models | python -m json.tool
-curl -s localhost:8000/metrics | grep -E 'num_requests|gpu_cache_usage'
 ```
 
-**Keep the port unexposed while measuring.** vLLM enforces no authentication by
-default, and a port exposed on RunPod gets a public URL at
-`https://<pod-id>-8000.proxy.runpod.net`, where anyone who has it can run
-inference billed to our account. Nothing in this runbook needs the endpoint to
-be public: the client runs on the same pod. Exposing it also puts internet
-round-trip time into every measurement, which is exactly the thing we are
-trying to measure cleanly.
-
-When A/B eventually needs to reach it, expose port 8000 in the pod config,
-restart the server with `--api-key <secret>`, and have callers set
-`VLLM_API_KEY` to the same value. A 502 from the proxy almost always means the
-server bound to localhost instead of `0.0.0.0`, or the exposed port does not
-match `--port`.
-
-## 7. Get the annotations and pick a few videos
-
-The dataset ships annotations only; videos are not redistributed and are
-fetched from their original sources, about 150 GB in total, mostly UCF-Crime.
-Do not run the full download. Pull the annotations, pick a handful of videos,
-then fetch only those from whichever single collection is easiest.
-
-```bash
-cd /workspace
-hf download nvidia/PhysicalAI-Traffic-Anomaly-Reasoning --repo-type dataset \
-  --include "train/*" "DOWNLOADING.md" "download_videos.py" --local-dir tar/
-# older huggingface_hub installs: huggingface-cli download ...
-```
-
-Inspect the schema before writing any filtering against it:
-
-```bash
-python - <<'PY'
-import json
-from pathlib import Path
-for name in ("bcq.json", "temporal_localization.json"):
-    data = json.loads((Path("tar/train") / name).read_text())
-    print(name, type(data).__name__, len(data))
-    first = data[0] if isinstance(data, list) else next(iter(data.items()))
-    print(json.dumps(first, indent=2)[:600], "\n")
-PY
-```
-
-Window labels must come from `train/`, where answers are present. The `test/`
-split has its answers redacted and is scored only by the challenge server, so
-timestamps taken from there cannot be checked locally.
-
-Pick roughly six videos with an annotated collision and six without, from one
-collection, and read `DOWNLOADING.md` for the per-source flags before fetching.
-
-## 8. Run the budget sweep
+## 6. Latency and tokens per budget
 
 ```bash
 cd /workspace/video-pipeline
+V=/workspace/videos/Accident-Bench/land_space
+
 uv run python -m gigacity_central.smoke \
-  --video /workspace/tar/videos/<collection>/<video>.mp4 \
-  --base-url http://127.0.0.1:8000 \
-  --budgets 4,8,16 --repeats 3 --window-s 10 \
-  --window-start-s <a second or two before the annotated collision> \
-  --out results/smoke-$(date +%Y%m%d).jsonl
+  --video $V/long/videos/000001.mp4 --window-start-s 50 \
+  --budgets 4,8,16 --repeats 10 --deadline-ms 5000 \
+  --out results/budget-sweep.jsonl
 ```
 
-Each record carries the window identity fields of the draft shared contract,
-the requested budget, actual frame count, per-frame and total encoded bytes,
-edge-side decode time, time to first token, total latency, prompt and completion
-token counts, and the parsed Yes/No answer. Requested budget and observed bytes
-stay separate fields so evaluation can compare what C asked for against what
-was actually sent.
+`--repeats 10` gives enough samples for a median. `--deadline-ms 5000` applies
+decision 18's deadline so `on_time` is recorded per request.
 
-Then sweep concurrent requests, which is the load variable the team settled on
-in place of camera count:
+## 7. Concurrency sweep — the main result
 
 ```bash
 for k in 1 2 4 8 16; do
-  uv run python -m gigacity_central.smoke --video <video> --budgets 8 \
-    --concurrency "$k" --repeats 3 --out "results/conc-$k.jsonl"
+  uv run python -m gigacity_central.smoke \
+    --video $V/long/videos/000001.mp4 --window-start-s 50 \
+    --budgets 8 --concurrency "$k" --repeats 5 --deadline-ms 5000 \
+    --out "results/conc-$k.jsonl"
 done
 ```
 
-Timings are measured server latencies from a client on the same host. There is
-no network emulation here, so they are not end-to-end edge numbers and must not
-be reported as such.
+Then repeat at `--budgets 4` and `--budgets 16` if time allows. That gives
+deadline compliance as a function of both load and budget, which is what the
+load-aware controller needs in order to choose between them.
 
-## 9. Check the degenerate-answer risk before trusting anything
+Cameras per GPU falls out of throughput: at one request per camera per 10 s
+window, sustained requests/s × 10 is the camera count. A/B got about 35 cameras
+for Qwen2.5-VL-7B on an A40; the 30B model will be lower, and by how much is the
+number nobody has.
 
-The pilot found that on crash videos accuracy fell as frames rose and the model
-answered No to about nine questions in ten. If that reproduces on the server,
-correct-on-time rate is dominated by a constant No and the budget controller has
-nothing to optimize, which would undercut the premise of the experiment rather
-than be a result of it.
+## 8. Stop the pod
 
-Run the sweep across the positive and negative videos from section 7 and look at
-the answer spread the summary prints. If every answer is No, prompt and
-resolution are the first suspects, and the finding goes to the team before any
-baseline is collected; it changes what Milestone 2 can show.
-
-## 10. Stop the pod
-
-Stopping a pod ends GPU billing; the network volume keeps billing at its
-per-GB-month rate, which is what makes the next launch fast. Terminating the pod
-and deleting the volume ends all billing but means re-downloading the model.
-Copy anything from the container's own disk to `/workspace` first, since only
-the volume is persistent. `results/` is gitignored, so the JSONL stays out of
-the repo; move what matters onto the volume before stopping.
+Pods → your pod → **Stop**. Ends GPU billing, keeps `/workspace`.
 
 ```bash
 cp -r results /workspace/results-$(date +%Y%m%d)
 ```
 
-## 11. Still to settle
+`results/` is gitignored, so raw JSONL stays out of the repo; publish a summary
+under `docs/results/` the way A/B do, with the same status caveat about what the
+numbers are and are not.
 
-- Response deadline for correct-on-time, and whether it starts at window
-  completion or earlier. Undefined at the time of writing.
-- Fallback budget when no valid budget exists. C/D's plan proposes 4 frames;
-  A/B's draft says the run's fixed default. These need to be the same number.
-- Load thresholds separating low, moderate, and high load. To be tuned on the
-  development split only, then frozen for reported runs.
-- Uplink units: the meeting summary says 5 MB/s, A/B's plan says 5 Mbit/s. That
-  is an 8x difference in every bandwidth conclusion.
+## 9. Open items this depends on
+
+- **Model choice.** Decision 3 pins Qwen2.5-VL-7B; A/B propose Qwen3-VL-30B-A3B.
+  This runbook assumes the proposal is adopted. If the team keeps Qwen2.5-VL-7B,
+  the frames-versus-accuracy curve stays flat and the budget controller has
+  little to optimise — that is a question for the team, not a detail.
+- **GPU for the reported runs.** The plan says A100 40 GB, which cannot serve the
+  FP8 model. Whichever card the team standardises on determines "cameras per GPU".
+- **Deadline start.** Decision 18 sets 5 s after the window ends; `--deadline-ms`
+  here measures from send time, which is close but not identical. Worth
+  reconciling before results are published.

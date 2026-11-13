@@ -35,15 +35,23 @@ import sys
 import time
 import uuid
 from dataclasses import dataclass, field
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
 import httpx
+from PIL import Image
 
 COLLISION_PROMPT = (
-    "Did any traffic collision occur during the shown observation window? "
-    "Answer only Yes or No."
+    "Did any traffic collision occur during the shown observation window?"
 )
+
+ANSWER_INSTRUCTION = "Answer only Yes or No."
+
+# Decision 10: fit inside 448x448, sides a multiple of 28, JPEG quality 85.
+FIT_PX = 448
+GRID = 28
+JPEG_QUALITY = 85
 
 YES_NO = re.compile(r"\b(yes|no)\b", re.IGNORECASE)
 
@@ -115,8 +123,18 @@ def uniform_capture_times(window: Window, budget: int) -> list[int]:
     return [min(t, window.end_ms - 1) for t in times]
 
 
+SCALE_FILTER = (
+    f"scale={FIT_PX}:{FIT_PX}:force_original_aspect_ratio=decrease,"
+    f"scale=trunc(iw/{GRID})*{GRID}:trunc(ih/{GRID})*{GRID}"
+)
+
+
 def extract_frame(video: Path, capture_ms: int, quality: int) -> bytes:
-    """Decode a single JPEG at capture_ms using a fast ffmpeg seek."""
+    """Decode one frame, resize per decision 10, and JPEG-encode it.
+
+    ffmpeg seeks and scales; Pillow does the JPEG encode so the quality
+    setting is the same number A/B used, rather than ffmpeg's 2-31 scale.
+    """
     out = subprocess.run(
         [
             "ffmpeg",
@@ -129,10 +147,12 @@ def extract_frame(video: Path, capture_ms: int, quality: int) -> bytes:
             str(video),
             "-frames:v",
             "1",
-            "-q:v",
-            str(quality),
+            "-vf",
+            SCALE_FILTER,
             "-f",
             "image2",
+            "-vcodec",
+            "png",
             "-",
         ],
         capture_output=True,
@@ -140,7 +160,10 @@ def extract_frame(video: Path, capture_ms: int, quality: int) -> bytes:
     )
     if not out.stdout:
         raise RuntimeError(f"ffmpeg returned no frame at {capture_ms} ms")
-    return out.stdout
+    image = Image.open(BytesIO(out.stdout)).convert("RGB")
+    buffer = BytesIO()
+    image.save(buffer, format="JPEG", quality=quality)
+    return buffer.getvalue()
 
 
 def select_frames(
@@ -156,15 +179,22 @@ def select_frames(
 
 
 def build_request(model: str, frames: list[Frame], prompt: str) -> dict[str, Any]:
-    """Build a pinned, deterministic chat-completions payload."""
-    content: list[dict[str, Any]] = [
-        {"type": "image_url", "image_url": {"url": f.data_url()}} for f in frames
-    ]
-    content.append({"type": "text", "text": prompt})
+    """Build the pinned, deterministic chat-completions payload.
+
+    Prompt layout follows decision 12: a "Frame i at t s:" line before each
+    image, then the question, then the answer instruction. Frames go as
+    separate images rather than video input (decision 9).
+    """
+    content: list[dict[str, Any]] = []
+    for index, frame in enumerate(frames, start=1):
+        seconds = frame.capture_ms / 1000
+        content.append({"type": "text", "text": f"Frame {index} at {seconds:.1f} s:"})
+        content.append({"type": "image_url", "image_url": {"url": frame.data_url()}})
+    content.append({"type": "text", "text": f"{prompt}\n{ANSWER_INSTRUCTION}"})
     return {
         "model": model,
         "messages": [{"role": "user", "content": content}],
-        "max_tokens": 4,
+        "max_tokens": 16,
         "temperature": 0.0,
         "seed": 0,
         "stream": True,
@@ -381,14 +411,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--video", required=True, help="source video path")
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
-    parser.add_argument("--model", default="Qwen/Qwen2.5-VL-7B-Instruct")
+    parser.add_argument("--model", default="Qwen/Qwen3-VL-30B-A3B-Instruct-FP8")
     parser.add_argument("--budgets", default="4,8,16")
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--concurrency", type=int, default=1)
     parser.add_argument("--window-start-s", type=int, default=0)
     parser.add_argument("--window-s", type=int, default=10)
     parser.add_argument("--camera-id", default="cam01")
-    parser.add_argument("--jpeg-quality", type=int, default=2, help="ffmpeg -q:v")
+    parser.add_argument("--jpeg-quality", type=int, default=JPEG_QUALITY)
     parser.add_argument("--prompt", default=COLLISION_PROMPT)
     parser.add_argument("--deadline-ms", type=int, default=0)
     parser.add_argument("--timeout-s", type=float, default=300.0)

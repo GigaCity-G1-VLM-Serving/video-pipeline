@@ -3,6 +3,7 @@
 import pytest
 
 from gigacity_central.smoke import (
+    ANSWER_INSTRUCTION,
     COLLISION_PROMPT,
     Frame,
     Window,
@@ -59,21 +60,32 @@ def test_answer_parsing(text: str, expected: str | None) -> None:
 
 
 def test_request_is_deterministic_and_carries_every_frame() -> None:
-    frames = [Frame(capture_ms=t, jpeg=b"\xff\xd8fake") for t in (0, 100, 200)]
+    frames = [Frame(capture_ms=t, jpeg=b"\xff\xd8fake") for t in (0, 1200, 2500)]
     payload = build_request("test-model", frames, COLLISION_PROMPT)
 
     assert payload["temperature"] == 0.0
     assert payload["seed"] == 0
+    assert payload["max_tokens"] == 16
     content = payload["messages"][0]["content"]
     images = [part for part in content if part["type"] == "image_url"]
     texts = [part for part in content if part["type"] == "text"]
     assert len(images) == len(frames)
-    assert len(texts) == 1
-    assert texts[0]["text"] == COLLISION_PROMPT
     assert all(
         part["image_url"]["url"].startswith("data:image/jpeg;base64,")
         for part in images
     )
+    assert texts[-1]["text"] == f"{COLLISION_PROMPT}\n{ANSWER_INSTRUCTION}"
+
+
+def test_each_image_is_preceded_by_its_capture_time() -> None:
+    """Decision 12: a 'Frame i at t s:' line before each image, in order."""
+    frames = [Frame(capture_ms=t, jpeg=b"\xff\xd8fake") for t in (0, 1200, 2500)]
+    content = build_request("m", frames, COLLISION_PROMPT)["messages"][0]["content"]
+
+    labels = [p["text"] for p in content[:-1] if p["type"] == "text"]
+    assert labels == ["Frame 1 at 0.0 s:", "Frame 2 at 1.2 s:", "Frame 3 at 2.5 s:"]
+    kinds = [p["type"] for p in content[:-1]]
+    assert kinds == ["text", "image_url"] * len(frames)
 
 
 def test_frame_byte_count_tracks_the_encoded_payload() -> None:
