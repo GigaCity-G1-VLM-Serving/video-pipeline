@@ -1,0 +1,17 @@
+{
+  "provider": "RunPod (A/B test server, not C's service)",
+  "gpu": "1x NVIDIA H100 80GB HBM3",
+  "image": "vllm/vllm-openai:v0.11.0",
+  "model": "Qwen/Qwen3-VL-30B-A3B-Instruct-FP8",
+  "model_revision": "d9748a51ae66354c4dad665aab2c71f26cf2c8cd",
+  "served_model_name": "qwen3-vl-30b-a3b",
+  "vllm_flags": {
+    "max_model_len": 8192,
+    "limit_mm_per_prompt": {"image": 16},
+    "gpu_memory_utilization": 0.92,
+    "seed": 0,
+    "enable_prefix_caching": false
+  },
+  "generation": {"temperature": 0, "max_tokens": 16},
+  "auth": "bearer key read from an environment variable on the pod; never recorded"
+}

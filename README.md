@@ -3,9 +3,23 @@
 A collision-focused research pipeline: replay recorded traffic video, select evidence
 at the edge, send it to central VLM serving, and evaluate the complete flow.
 
-**Status:** development foundation and draft contracts. There is no inference server
-or end-to-end video demo yet. Frames versus clips and the serving engine remain open
-for joint A/B and C/D review.
+**Status:** development foundation and draft contracts. A/B have proposed the
+inference handoff (JPEG frames sent as separate images, vLLM serving); C/D review is
+pending. See the [plan](docs/plan.md) and [decision log](docs/decisions.md).
+
+## Where things are documented
+
+| Document | Purpose |
+|---|---|
+| [docs/plan.md](docs/plan.md) | Canonical milestones, owners, and status |
+| [docs/decisions.md](docs/decisions.md) | Canonical decision log: agreed, proposed, open |
+| [docs/architecture.md](docs/architecture.md) | Components, ownership, and data flow |
+| [docs/contracts.md](docs/contracts.md) | Shared message semantics; models in `packages/contracts` |
+| [docs/research/](docs/research/) | Historical research snapshots, not current decisions |
+| Team Google Docs | Discussion, proposals, meeting notes, mentor feedback |
+
+Proposals are discussed in the team Google Docs. Once agreed, they are recorded in
+this repo, which is authoritative when the two disagree.
 
 ## Setup
 

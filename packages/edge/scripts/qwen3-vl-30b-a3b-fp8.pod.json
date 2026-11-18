@@ -1,0 +1,31 @@
+{
+  "_comment": "RunPod POST /v1/pods body. Replace VLLM_API_KEY's placeholder with a random token at launch; never commit it. Port 8001 serves only /logs (startup log and nvidia-smi).",
+  "name": "ab-vllm-qwen3-vl-30b-a3b-fp8",
+  "imageName": "vllm/vllm-openai:v0.11.0",
+  "computeType": "GPU",
+  "gpuCount": 1,
+  "gpuTypeIds": [
+    "NVIDIA L40S",
+    "NVIDIA RTX 6000 Ada Generation",
+    "NVIDIA L40",
+    "NVIDIA H100 PCIe",
+    "NVIDIA H100 80GB HBM3"
+  ],
+  "gpuTypePriority": "custom",
+  "containerDiskInGb": 80,
+  "volumeInGb": 0,
+  "ports": [
+    "8000/http",
+    "8001/http"
+  ],
+  "dockerEntrypoint": [
+    "/bin/bash",
+    "-c"
+  ],
+  "dockerStartCmd": [
+    "mkdir -p /logs; cd /logs; (python3 -m http.server 8001 --directory /logs >/dev/null 2>&1 &); nvidia-smi > /logs/nvidia-smi.txt 2>&1; python3 -m vllm.entrypoints.openai.api_server --model Qwen/Qwen3-VL-30B-A3B-Instruct-FP8 --revision d9748a51ae66354c4dad665aab2c71f26cf2c8cd --served-model-name qwen3-vl-30b-a3b --host 0.0.0.0 --port 8000 --max-model-len 8192 --limit-mm-per-prompt '{\"image\": 16}' --gpu-memory-utilization 0.92 --seed 0 --no-enable-prefix-caching 2>&1 | tee /logs/vllm.log"
+  ],
+  "env": {
+    "VLLM_API_KEY": "<set-at-launch>"
+  }
+}

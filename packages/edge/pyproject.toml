@@ -4,7 +4,17 @@ version = "0.1.0"
 description = "GigaCity edge package"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["gigacity-contracts"]
+dependencies = [
+    "gigacity-contracts",
+    "numpy>=2.5.4",
+    "opencv-python-headless>=5.0.0.93",
+]
+
+[project.optional-dependencies]
+clip = [
+    "onnxruntime>=1.31.0,<1.31.1",
+    "tokenizers>=0.23.3,<0.24",
+]
 
 [build-system]
 requires = ["hatchling>=1.26"]
