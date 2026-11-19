@@ -77,21 +77,12 @@ The Pydantic models enforce these rules:
 `byte_count` and `total_bytes` refer to encoded image bytes. They do not include
 Base64 expansion, JSON overhead, or HTTP headers.
 
-## 4. Image transport — pending agreement
+## 4. Image transport — proposed for v1
 
-The exact transport mechanism must be agreed by B and C (need to be coordinated with
-Aryan). Possible approaches include inline Base64, URI/object-storage references,
-or multipart HTTP.
-
-For this draft, `data_ref` is a string placeholder for the agreed payload
-reference. The example value is illustrative and is not a claim that a storage
-service or URI scheme has been selected.
-
-Before integration, document:
-- how B transmits the image bytes;
-- how C resolves or receives `data_ref`;
-- whether references are inline data, URIs, or multipart part identifiers;
-- access control, lifetime, and cleanup expectations if external storage is used.
+The draft HTTP endpoint accepts inline JPEG data URIs in `data_ref`. The receiving
+service checks the base64 and decoded byte count. This transport is pending joint
+review with A/B. See the [draft HTTP contract](../../../../docs/contracts.md#draft-http-endpoint)
+for the endpoint and response behavior.
 
 ## 5. Scope boundaries
 
@@ -106,7 +97,7 @@ It does not define:
 
 ## 6. Example
 
-See [`docs/examples/inference_request.json`](../examples/inference_request.json).
+See [`docs/examples/inference_request.json`](../../../../docs/examples/inference_request.json).
 
 ## 7. Open questions for review
 
