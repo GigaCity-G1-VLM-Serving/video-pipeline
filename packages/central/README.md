@@ -22,3 +22,19 @@ curl -fsS http://127.0.0.1:8200/v1/infer \
 
 The response contains the request's IDs and a synthetic Yes answer. See
 [the draft contract](../../docs/contracts.md#draft-http-endpoint).
+
+## Connect to vLLM
+
+With a vLLM server running, start C locally. The base URL ends before `/v1`.
+Use the served name from vLLM's `/v1/models` response. Set `VLLM_API_KEY` in the
+environment when the upstream endpoint requires bearer authentication.
+
+```bash
+uv run --no-sync python -m gigacity_central.server \
+  --vllm-url http://127.0.0.1:8000 \
+  --model qwen3-vl-30b-a3b --port 8200
+```
+
+A/B still sends requests to C at `http://127.0.0.1:8200/v1/infer`. The example
+request has placeholder image bytes. Use the edge runner to send real JPEGs
+when checking vLLM.
