@@ -46,7 +46,8 @@ are in [decisions](decisions.md).
 - `window.window_id` doubles as the request ID; `query` carries the question.
 - **Proposed v1 transport:** `data_ref` holds an inline data URI
   (`data:image/jpeg;base64,...`), which C can pass straight to vLLM as an image URL.
-  The model does not check `byte_count` against the payload; A/B's edge tests do.
+  The central endpoint checks that the URI contains valid base64 and that its
+  decoded size matches `byte_count`.
 - The request has no frame budget field. For fixed-budget runs `budget_id` is null and
   the budget is recorded in `EdgeRecord.frame_budget` and the window ID.
 
@@ -55,8 +56,8 @@ images** with their capture times in the prompt, not as model "video" input: for
 Qwen2.5-VL, video input assumes evenly spaced frames and would distort selected,
 irregularly spaced frames. See [decisions](decisions.md).
 
-`InferenceResult` and `EdgeRecord` are A/B proposals awaiting C/D review; the shared
-request does not define a response yet.
+`InferenceResult` and `EdgeRecord` are draft shared response and evaluation
+models awaiting team review.
 
 `InferenceResult` (C → B/D, [example](examples/inference_result.json)): `status` is
 `completed`, `rejected`, `failed`, or `late`; completed results require a parsed
@@ -76,6 +77,19 @@ used only for latency; `*_duration_ms` and stage `*_ms` fields are measured on o
 machine. End-to-end latency is measured on B's clock to avoid cross-machine skew.
 D joins records by `run_id` and `window_id`; a window without a completed result
 counts as a miss.
+
+## Draft HTTP endpoint
+
+- `GET /health` returns HTTP 200 if the C process is reachable.
+- `POST /v1/infer` accepts an `InferenceRequest` JSON body with inline JPEG data
+  URIs. C returns HTTP 400 with an error object for an invalid body or transport.
+- For a valid request, C returns HTTP 200 with an `InferenceResult` and echoes
+  `run_id` and `window_id`. A backend answer produces `completed`, with
+  `unparsed` when the first word cannot be read as Yes or No. A reported backend
+  error produces `failed` without an answer.
+- The synthetic backend identifies itself with `is_synthetic` and a synthetic
+  model ID. Admission and deadline classification require separate integration
+  work. The current endpoint records receipt and completion timestamps.
 
 ## Handoffs still awaiting review
 
