@@ -3,19 +3,15 @@
 import argparse
 import base64
 import binascii
+import os
 import string
 import time
-from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from gigacity_central.backends import Backend, BackendError, vllm_backend
 from gigacity_contracts import InferenceRequest, InferenceResult
 
-Backend = Callable[[InferenceRequest], str | None]
 JPEG_DATA_URI = "data:image/jpeg;base64,"
-
-
-class BackendError(Exception):
-    """Expected inference failure reported by an adapter."""
 
 
 def validate_frames(request: InferenceRequest) -> None:
@@ -110,20 +106,37 @@ def build_server(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8200)
-    parser.add_argument("--synthetic", action="store_true", required=True)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--synthetic", action="store_true")
+    mode.add_argument("--vllm-url", help="vLLM base URL without /v1")
+    parser.add_argument("--model", help="Model name listed by vLLM at /v1/models")
+    parser.add_argument("--backend-timeout", type=float, default=120.0)
     args = parser.parse_args()
 
     def synthetic_answer(_request: InferenceRequest) -> str:
         return "Yes"
 
+    backend: Backend = synthetic_answer
+    model_id = "central-synthetic"
+    if args.vllm_url:
+        if not args.model or not args.model.strip():
+            parser.error("--vllm-url requires --model")
+        if args.backend_timeout <= 0:
+            parser.error("--backend-timeout must be positive")
+        model_id = args.model
+        backend = vllm_backend(
+            args.vllm_url,
+            args.model,
+            api_key=os.environ.get("VLLM_API_KEY"),
+            timeout=args.backend_timeout,
+        )
+
     with build_server(
-        synthetic_answer,
-        model_id="central-synthetic",
-        is_synthetic=True,
-        port=args.port,
+        backend, model_id=model_id, is_synthetic=args.synthetic, port=args.port
     ) as server:
         print(
-            f"Synthetic C endpoint at http://127.0.0.1:{server.server_port}", flush=True
+            f"C endpoint for {model_id} at http://127.0.0.1:{server.server_port}",
+            flush=True,
         )
         server.serve_forever()
 
